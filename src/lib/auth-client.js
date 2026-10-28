@@ -1,0 +1,15 @@
+// src/lib/auth-client.js
+// Browser-side Better Auth client. Used by client components for sign-in/out.
+// Better Auth requires an absolute baseURL — relative paths don't work.
+import { createAuthClient } from 'better-auth/react';
+
+const baseURL =
+  (typeof window !== 'undefined' ? window.location.origin : '') ||
+  process.env.NEXT_PUBLIC_APP_URL ||
+  'http://localhost:3000';
+
+export const authClient = createAuthClient({ baseURL });
+
+export const { signIn, signOut, signUp, useSession } = authClient;
+
+export default authClient;

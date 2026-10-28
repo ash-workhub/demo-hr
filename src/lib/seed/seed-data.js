@@ -1,0 +1,148 @@
+// src/lib/seed/seed-data.js
+// FegHR Demo — fictional org chart. Shared by the seed script and demo utilities.
+// All times/dates: Asia/Dhaka (TZ env var handles new Date() formatting).
+
+export const DEMO_PASSWORD = 'FegHR-Demo-2026!'; // demo-only; rotate after prototype.
+
+// Use a fixed join-year so the seed is deterministic.
+export const SEED_YEAR = 2026;
+
+export const ORG = [
+  // --- Admin ---
+  {
+    code: 'FEG-001',
+    firstName: 'Aria',
+    lastName: 'Hossain',
+    email: 'admin@feghr.demo',
+    phone: '+8801710000001',
+    department: 'Operations',
+    designation: 'System Administrator',
+    role: 'admin',
+    managerCode: null,
+    joinDate: '2024-01-15',
+    avatarColor: '#7c3aed',
+  },
+  // --- HR ---
+  {
+    code: 'FEG-002',
+    firstName: 'Nadia',
+    lastName: 'Rahman',
+    email: 'hr@feghr.demo',
+    phone: '+8801710000002',
+    department: 'People & Culture',
+    designation: 'HR Manager',
+    role: 'hr',
+    managerCode: null,
+    joinDate: '2024-02-01',
+    avatarColor: '#db2777',
+  },
+  // --- Managers ---
+  {
+    code: 'FEG-003',
+    firstName: 'Tanvir',
+    lastName: 'Ahmed',
+    email: 'mgr.eng@feghr.demo',
+    phone: '+8801710000003',
+    department: 'Engineering',
+    designation: 'Engineering Manager',
+    role: 'manager',
+    managerCode: null,
+    joinDate: '2024-03-10',
+    avatarColor: '#0891b2',
+  },
+  {
+    code: 'FEG-004',
+    firstName: 'Sadia',
+    lastName: 'Islam',
+    email: 'mgr.sales@feghr.demo',
+    phone: '+8801710000004',
+    department: 'Sales',
+    designation: 'Sales Manager',
+    role: 'manager',
+    managerCode: null,
+    joinDate: '2024-03-15',
+    avatarColor: '#16a34a',
+  },
+  // --- Engineering reports ---
+  {
+    code: 'FEG-005',
+    firstName: 'Rafi',
+    lastName: 'Karim',
+    email: 'emp1@feghr.demo',
+    phone: '+8801710000005',
+    department: 'Engineering',
+    designation: 'Junior Engineer',
+    role: 'employee',
+    managerCode: 'FEG-003',
+    joinDate: '2024-06-01',
+    avatarColor: '#0ea5e9',
+  },
+  {
+    code: 'FEG-006',
+    firstName: 'Mehzabin',
+    lastName: 'Chowdhury',
+    email: 'emp2@feghr.demo',
+    phone: '+8801710000006',
+    department: 'Engineering',
+    designation: 'Senior Engineer',
+    role: 'employee',
+    managerCode: 'FEG-003',
+    joinDate: '2024-04-20',
+    avatarColor: '#f59e0b',
+  },
+  {
+    code: 'FEG-007',
+    firstName: 'Imran',
+    lastName: 'Khan',
+    email: 'emp3@feghr.demo',
+    phone: '+8801710000007',
+    department: 'Engineering',
+    designation: 'QA Engineer',
+    role: 'employee',
+    managerCode: 'FEG-003',
+    joinDate: '2024-07-05',
+    avatarColor: '#ef4444',
+  },
+  // --- Sales reports ---
+  {
+    code: 'FEG-008',
+    firstName: 'Farhana',
+    lastName: 'Yasmin',
+    email: 'emp4@feghr.demo',
+    phone: '+8801710000008',
+    department: 'Sales',
+    designation: 'Sales Representative',
+    role: 'employee',
+    managerCode: 'FEG-004',
+    joinDate: '2024-05-12',
+    avatarColor: '#8b5cf6',
+  },
+  {
+    code: 'FEG-009',
+    firstName: 'Shakib',
+    lastName: 'Miah',
+    email: 'emp5@feghr.demo',
+    phone: '+8801710000009',
+    department: 'Sales',
+    designation: 'Account Manager',
+    role: 'employee',
+    managerCode: 'FEG-004',
+    joinDate: '2024-08-01',
+    avatarColor: '#14b8a6',
+  },
+  {
+    code: 'FEG-010',
+    firstName: 'Lamia',
+    lastName: 'Akter',
+    email: 'emp6@feghr.demo',
+    phone: '+8801710000010',
+    department: 'Sales',
+    designation: 'Sales Development Rep',
+    role: 'employee',
+    managerCode: 'FEG-004',
+    joinDate: '2024-09-15',
+    avatarColor: '#f97316',
+  },
+];
+
+export default ORG;

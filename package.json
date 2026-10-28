@@ -1,0 +1,40 @@
+{
+  "name": "feghr-v1",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3000 --webpack 2>&1 | tee dev.log",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "seed": "node scripts/seed.mjs",
+    "check-db": "node scripts/check-db.js",
+    "db:push": "echo 'Using MongoDB Atlas via Mongoose — no schema push needed'",
+    "db:generate": "echo 'no-op'",
+    "db:migrate": "echo 'no-op'",
+    "db:reset": "echo 'no-op'"
+  },
+  "dependencies": {
+    "@heroui/react": "^3.2.6",
+    "better-auth": "^1.7.14",
+    "clsx": "^2.1.1",
+    "framer-motion": "^14.7.1",
+    "mongodb": "^7.7.0",
+    "mongoose": "^9.11.4",
+    "next": "^16.1.1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "recharts": "^2.15.4",
+    "zod": "^4.0.2"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "26.6.5",
+    "@types/react": "19.3.0",
+    "eslint": "^9",
+    "eslint-config-next": "^16.1.1",
+    "tailwindcss": "^4",
+    "vitest": "^5.0.5"
+  }
+}

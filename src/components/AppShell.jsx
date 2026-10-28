@@ -103,6 +103,13 @@ export default function AppShell({ user, employee }) {
     setActiveView('notifications');
   }
 
+  // Allow child views (e.g. NotificationsView) to navigate to another view by key.
+  function handleNavigate(viewKey) {
+    if (validKeys.has(viewKey)) {
+      setActiveView(viewKey);
+    }
+  }
+
   const ActiveView = VIEWS[activeView] || DashboardView;
   const title = VIEW_TITLES[activeView] || 'FegHR';
 
@@ -126,7 +133,7 @@ export default function AppShell({ user, employee }) {
         />
         <main className="flex-1 p-4 md:p-8">
           <div className="max-w-6xl mx-auto">
-            <ActiveView user={user} employee={employee} />
+            <ActiveView user={user} employee={employee} onNavigate={handleNavigate} />
           </div>
         </main>
         <footer className="mt-auto py-4 px-6 text-center text-xs text-slate-400 border-t border-slate-200 bg-white">

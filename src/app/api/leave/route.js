@@ -189,22 +189,19 @@ export async function POST(request) {
   // Notify the manager (if any) that there's a new leave to approve
   if (employee.managerId) {
     try {
-      // Find the manager's user account by employeeId
-      const managerUser = await Employee.findById(employee.managerId).lean();
-      if (managerUser) {
-        const User = (await import('@/lib/db/index.js')).User;
-        const mgrUser = await User.findOne({ employeeId: employee.managerId }).lean();
-        if (mgrUser) {
-          await Notification.create({
-            userId: mgrUser._id,
-            type: 'leave_submitted',
-            title: 'New leave request',
-            message: `${employee.firstName} ${employee.lastName} requested ${days} day(s) of ${data.leaveType} leave`,
-            link: 'approvals',
-            relatedId: lr._id,
-            read: false,
-          });
-        }
+      const { User } = await import('@/lib/db/index.js');
+      // User.employeeId is stored as a string (Better Auth), so cast ObjectId to string.
+      const mgrUser = await User.findOne({ employeeId: employee.managerId.toString() }).lean();
+      if (mgrUser) {
+        await Notification.create({
+          userId: mgrUser._id,
+          type: 'leave_submitted',
+          title: 'New leave request',
+          message: `${employee.firstName} ${employee.lastName} requested ${days} day(s) of ${data.leaveType} leave`,
+          link: 'approvals',
+          relatedId: lr._id,
+          read: false,
+        });
       }
     } catch (e) {
       // Notification is best-effort — don't fail the leave creation

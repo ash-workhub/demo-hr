@@ -134,7 +134,8 @@ export async function POST(request, { params }) {
 
   // Notify the employee about the decision
   try {
-    const ownerUser = await User.findOne({ employeeId: lr.employeeId }).lean();
+    // User.employeeId is stored as a string (Better Auth), so cast ObjectId to string.
+    const ownerUser = await User.findOne({ employeeId: lr.employeeId.toString() }).lean();
     if (ownerUser) {
       const approved = result.nextStatus === 'approved';
       const movedToHr = result.nextStatus === 'pending_hr';

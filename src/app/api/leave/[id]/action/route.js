@@ -62,7 +62,10 @@ export async function POST(request, { params }) {
   }
 
   const { data, error } = validate(leaveActionSchema, body);
-  if (error) return Response.json({ error }, { status: 422 });
+  if (error) {
+    
+    return Response.json({ error }, { status: 422 });
+  }
 
   const engineAction = data.decision === 'approved' ? 'approve' : 'reject';
 

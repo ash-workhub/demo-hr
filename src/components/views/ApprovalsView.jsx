@@ -130,8 +130,8 @@ export default function ApprovalsView({ user, employee }) {
               lr={lr}
               user={user}
               acting={acting === lr.id}
-              onApprove={(note) => handleAction(lr.id, 'approve', note)}
-              onReject={(note) => handleAction(lr.id, 'reject', note)}
+              onApprove={(note) => handleAction(lr.id, 'approved', note)}
+              onReject={(note) => handleAction(lr.id, 'rejected', note)}
             />
           ))}
         </ul>

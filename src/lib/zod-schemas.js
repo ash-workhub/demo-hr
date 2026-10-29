@@ -273,6 +273,13 @@ export const updateNoticeSchema = z.object({
   audienceRoles: z.array(z.enum(['employee', 'manager', 'hr', 'admin'])).min(1).optional(),
 }).refine((d) => Object.keys(d).length > 0, 'At least one field is required');
 
+// --- V3 Step 1: Payroll settings ---
+export const updatePayrollSettingsSchema = z.object({
+  displayCurrency: z.string().trim().min(1, 'Currency is required').max(10).optional(),
+  isDemoMode: z.boolean().optional(),
+  enabled: z.boolean().optional(),
+}).refine((d) => Object.keys(d).length > 0, 'At least one field is required');
+
 // --- Helpers ---
 /** Validates `body` against a Zod schema; returns { data } or { error }. */
 export function validate(schema, body) {

@@ -10,6 +10,7 @@ import DashboardView from './views/DashboardView.jsx';
 import DirectoryView from './views/DirectoryView.jsx';
 import OrganizationView from './views/OrganizationView.jsx';
 import AttendanceView from './views/AttendanceView.jsx';
+import AttendanceAdminView from './views/AttendanceAdminView.jsx';
 import LeaveView from './views/LeaveView.jsx';
 import ApprovalsView from './views/ApprovalsView.jsx';
 import NotificationsView from './views/NotificationsView.jsx';
@@ -19,6 +20,7 @@ const VIEWS = {
   directory: DirectoryView,
   organization: OrganizationView,
   attendance: AttendanceView,
+  'attendance-admin': AttendanceAdminView,
   leave: LeaveView,
   approvals: ApprovalsView,
   notifications: NotificationsView,
@@ -29,6 +31,7 @@ const VIEW_TITLES = {
   directory: 'Employee Directory',
   organization: 'Organization',
   attendance: 'Daily Attendance',
+  'attendance-admin': 'Attendance Admin',
   leave: 'Leave Requests',
   approvals: 'Approvals',
   notifications: 'Notifications',

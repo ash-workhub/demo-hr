@@ -29,6 +29,12 @@ export const NAV_ITEMS = [
     roles: null,
   },
   {
+    key: 'attendance-admin',
+    label: 'Attendance Admin',
+    icon: 'clock',
+    roles: ['hr', 'admin'],
+  },
+  {
     key: 'leave',
     label: 'Leave Requests',
     icon: 'calendar',

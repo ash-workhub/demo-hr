@@ -1,20 +1,37 @@
 // src/app/api/attendance/route.js
 // GET  /api/attendance           — today's status (self) + team view (managers/hr/admin)
 // POST /api/attendance           — check-in or check-out (self only)
-import { connectDB, Employee, Attendance } from '@/lib/db/index.js';
+//
+// V2 Step 2: POST now also appends to rawPunches (immutable), freezes policySnapshot,
+// and computes effectiveStatus. V1 checkInTime/checkOutTime/status fields still set
+// for backward compat. GET returns effective values (correctedX ?? rawX).
+import { connectDB, Employee, Attendance, AttendancePolicy, Holiday, EmployeeSchedule } from '@/lib/db/index.js';
 import { requireUser, getSessionEmployee } from '@/lib/auth-helpers.js';
 import { attendanceActionSchema, validate } from '@/lib/zod-schemas.js';
 import { todayKey, isLate, computeStatus, formatLocalTime, lastNDays, dateKey } from '@/lib/attendance.js';
+import {
+  resolveEffectivePolicy,
+  computeEffectiveStatus,
+  localMinutesFromUTC,
+  timeToMinutes,
+} from '@/lib/attendance-engine.js';
 
 function toSafe(a, emp) {
   return {
     id: a._id.toString(),
     employeeId: a.employeeId ? a.employeeId.toString() : null,
     date: a.date,
+    // V1 fields (raw — kept for compat):
     checkInTime: a.checkInTime,
     checkOutTime: a.checkOutTime,
     status: a.status,
     notes: a.notes || '',
+    // V2 Step 2 — effective values (corrected ?? raw):
+    effectiveCheckInTime: a.correctedCheckInTime ?? a.checkInTime,
+    effectiveCheckOutTime: a.correctedCheckOutTime ?? a.checkOutTime,
+    effectiveStatus: a.correctedStatus ?? a.status,
+    hasCorrection: !!(a.correctedCheckInTime || a.correctedCheckOutTime || a.correctedStatus),
+    rawPunchCount: (a.rawPunches || []).length,
     // Include employee info if populated
     employee: emp ? {
       id: emp._id.toString(),
@@ -151,6 +168,16 @@ export async function POST(request) {
   const today = todayKey();
   const now = new Date();
 
+  // V2 Step 2 — resolve the effective policy for this employee today.
+  const company = 'FegHR Demo';
+  const activePolicy = await AttendancePolicy.findOne({ company, endDate: null, status: 'active' }).lean();
+  const employeeSchedule = await EmployeeSchedule.findOne({ employeeId: employee._id, endDate: null }).lean();
+  const effectivePolicy = resolveEffectivePolicy(activePolicy, employeeSchedule);
+
+  // Check if today is a holiday.
+  const holiday = await Holiday.findOne({ company, date: today, status: 'active' }).lean();
+  const isHolidayDate = !!holiday;
+
   // Find or create today's record
   let record = await Attendance.findOne({ employeeId: employee._id, date: today });
   if (!record) {
@@ -160,7 +187,26 @@ export async function POST(request) {
       checkInTime: null,
       checkOutTime: null,
       status: 'absent',
+      rawPunches: [],
+      policySnapshot: {
+        workdays: effectivePolicy.workdays,
+        startTime: effectivePolicy.startTime,
+        endTime: effectivePolicy.endTime,
+        graceMinutes: effectivePolicy.graceMinutes,
+        lateAfterMinutes: effectivePolicy.lateAfterMinutes,
+        halfDayMinMinutes: effectivePolicy.halfDayMinMinutes,
+      },
     });
+  } else if (!record.policySnapshot) {
+    // Backfill policySnapshot on existing V1 records (lazy migration).
+    record.policySnapshot = {
+      workdays: effectivePolicy.workdays,
+      startTime: effectivePolicy.startTime,
+      endTime: effectivePolicy.endTime,
+      graceMinutes: effectivePolicy.graceMinutes,
+      lateAfterMinutes: effectivePolicy.lateAfterMinutes,
+      halfDayMinMinutes: effectivePolicy.halfDayMinMinutes,
+    };
   }
 
   if (data.action === 'check-in') {
@@ -168,7 +214,10 @@ export async function POST(request) {
       return Response.json({ error: { _: 'Already checked in today' } }, { status: 409 });
     }
     record.checkInTime = now;
+    // V1 compat: use hardcoded isLate for the status field.
     record.status = isLate(now) ? 'late' : 'present';
+    // V2 Step 2: append immutable raw punch.
+    record.rawPunches.push({ type: 'in', time: now, source: 'self', createdAt: now });
     if (data.notes) record.notes = data.notes;
   } else if (data.action === 'check-out') {
     if (!record.checkInTime) {
@@ -179,6 +228,8 @@ export async function POST(request) {
     }
     record.checkOutTime = now;
     if (data.notes) record.notes = data.notes;
+    // V2 Step 2: append immutable raw punch.
+    record.rawPunches.push({ type: 'out', time: now, source: 'self', createdAt: now });
   }
 
   await record.save();

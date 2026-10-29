@@ -11,3 +11,9 @@ export { default as Branch } from './models/Branch.js';
 export { default as Department } from './models/Department.js';
 export { default as Designation } from './models/Designation.js';
 export { default as EmployeeAssignment } from './models/EmployeeAssignment.js';
+// V2 Step 2 — attendance policy config + corrections + reviews
+export { default as AttendancePolicy } from './models/AttendancePolicy.js';
+export { default as Holiday } from './models/Holiday.js';
+export { default as EmployeeSchedule } from './models/EmployeeSchedule.js';
+export { default as AttendanceCorrection, CORRECTION_STATUS } from './models/AttendanceCorrection.js';
+export { default as AttendanceReview, REVIEW_VERDICT, FLAG_SEVERITY } from './models/AttendanceReview.js';

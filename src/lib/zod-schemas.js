@@ -118,6 +118,80 @@ export const createAssignmentSchema = z.object({
   reason: z.string().trim().max(500).optional().default(''),
 }).refine((data) => data.effectiveDate, { message: 'Effective date is required', path: ['effectiveDate'] });
 
+// --- V2 Step 2: Attendance policy ---
+const TIME_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
+
+export const createPolicySchema = z.object({
+  name: z.string().trim().min(1, 'Name is required').max(80),
+  effectiveDate: z.string().refine((v) => !isNaN(Date.parse(v)), 'Invalid effective date'),
+  workdays: z.array(z.number().int().min(0).max(6)).min(1, 'At least one workday required').default([1, 2, 3, 4, 5]),
+  startTime: z.string().regex(TIME_REGEX, 'Invalid start time (HH:mm)').default('09:00'),
+  endTime: z.string().regex(TIME_REGEX, 'Invalid end time (HH:mm)').default('17:00'),
+  graceMinutes: z.number().int().min(0).max(120).default(15),
+  halfDayMinMinutes: z.number().int().min(0).max(600).optional().nullable(),
+  status: z.enum(['active', 'inactive']).optional().default('active'),
+}).refine((d) => d.startTime < d.endTime, { message: 'Start time must be before end time', path: ['endTime'] });
+
+export const updatePolicySchema = z.object({
+  name: z.string().trim().min(1).max(80).optional(),
+  workdays: z.array(z.number().int().min(0).max(6)).min(1).optional(),
+  startTime: z.string().regex(TIME_REGEX).optional(),
+  endTime: z.string().regex(TIME_REGEX).optional(),
+  graceMinutes: z.number().int().min(0).max(120).optional(),
+  halfDayMinMinutes: z.number().int().min(0).max(600).optional().nullable(),
+  status: z.enum(['active', 'inactive']).optional(),
+}).refine((d) => Object.keys(d).length > 0, 'At least one field is required');
+
+// --- V2 Step 2: Holiday ---
+export const createHolidaySchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date (YYYY-MM-DD)'),
+  name: z.string().trim().min(1, 'Name is required').max(100),
+  type: z.enum(['national', 'religious', 'company']).optional().default('company'),
+  status: z.enum(['active', 'inactive']).optional().default('active'),
+});
+
+export const updateHolidaySchema = z.object({
+  name: z.string().trim().min(1).max(100).optional(),
+  type: z.enum(['national', 'religious', 'company']).optional(),
+  status: z.enum(['active', 'inactive']).optional(),
+}).refine((d) => Object.keys(d).length > 0, 'At least one field is required');
+
+// --- V2 Step 2: Employee schedule ---
+export const createScheduleSchema = z.object({
+  employeeId: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid employee id'),
+  effectiveDate: z.string().refine((v) => !isNaN(Date.parse(v)), 'Invalid effective date'),
+  policyId: z.string().regex(/^[0-9a-fA-F]{24}$/).optional().nullable(),
+  customStartTime: z.string().regex(TIME_REGEX).optional().nullable(),
+  customEndTime: z.string().regex(TIME_REGEX).optional().nullable(),
+  customWorkdays: z.array(z.number().int().min(0).max(6)).optional().default([]),
+  reason: z.string().trim().max(500).optional().default(''),
+});
+
+// --- V2 Step 2: Attendance correction ---
+export const createCorrectionSchema = z.object({
+  attendanceId: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid attendance id'),
+  field: z.enum(['checkInTime', 'checkOutTime', 'status']),
+  correctedValue: z.string().min(1, 'Corrected value is required'),
+  reason: z.string().trim().min(5, 'Reason must be at least 5 characters').max(500),
+});
+
+export const correctionActionSchema = z.object({
+  action: z.enum(['confirm', 'reject', 'apply']),
+  rejectReason: z.string().trim().max(500).optional().default(''),
+});
+
+// --- V2 Step 2: Attendance review ---
+export const createReviewSchema = z.object({
+  attendanceId: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid attendance id'),
+  flagReason: z.string().trim().min(1, 'Flag reason is required').max(200),
+  flagSeverity: z.enum(['low', 'medium', 'high']).optional().default('medium'),
+});
+
+export const reviewActionSchema = z.object({
+  verdict: z.enum(['acknowledged', 'dismissed', 'upheld']),
+  note: z.string().trim().max(500).optional().default(''),
+});
+
 // --- Helpers ---
 /** Validates `body` against a Zod schema; returns { data } or { error }. */
 export function validate(schema, body) {

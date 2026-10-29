@@ -259,6 +259,20 @@ export const reassignApproverSchema = z.object({
   reason: z.string().trim().min(5, 'Reason must be at least 5 characters').max(500),
 });
 
+// --- V2 Step 5: Company notices ---
+export const createNoticeSchema = z.object({
+  title: z.string().trim().min(1, 'Title is required').max(200),
+  body: z.string().trim().min(1, 'Body is required').max(5000),
+  audienceRoles: z.array(z.enum(['employee', 'manager', 'hr', 'admin'])).min(1, 'At least one audience role required'),
+  status: z.enum(['draft', 'published']).optional().default('draft'),
+});
+
+export const updateNoticeSchema = z.object({
+  title: z.string().trim().min(1).max(200).optional(),
+  body: z.string().trim().min(1).max(5000).optional(),
+  audienceRoles: z.array(z.enum(['employee', 'manager', 'hr', 'admin'])).min(1).optional(),
+}).refine((d) => Object.keys(d).length > 0, 'At least one field is required');
+
 // --- Helpers ---
 /** Validates `body` against a Zod schema; returns { data } or { error }. */
 export function validate(schema, body) {

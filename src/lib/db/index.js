@@ -22,3 +22,6 @@ export { default as LeaveType } from './models/LeaveType.js';
 export { default as LeaveAdjustment } from './models/LeaveAdjustment.js';
 // V2 Step 4 — configurable approval policies
 export { default as ApprovalPolicy } from './models/ApprovalPolicy.js';
+// V2 Step 5 — company notices + read state
+export { default as CompanyNotice, NOTICE_STATUS, AUDIENCE_ROLES } from './models/CompanyNotice.js';
+export { default as NoticeReadState } from './models/NoticeReadState.js';

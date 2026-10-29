@@ -14,6 +14,7 @@ import AttendanceAdminView from './views/AttendanceAdminView.jsx';
 import LeaveView from './views/LeaveView.jsx';
 import ApprovalsView from './views/ApprovalsView.jsx';
 import NotificationsView from './views/NotificationsView.jsx';
+import NoticesView from './views/NoticesView.jsx';
 
 const VIEWS = {
   dashboard: DashboardView,
@@ -24,6 +25,7 @@ const VIEWS = {
   leave: LeaveView,
   approvals: ApprovalsView,
   notifications: NotificationsView,
+  notices: NoticesView,
 };
 
 const VIEW_TITLES = {
@@ -35,6 +37,7 @@ const VIEW_TITLES = {
   leave: 'Leave Requests',
   approvals: 'Approvals',
   notifications: 'Notifications',
+  notices: 'Company Notices',
 };
 
 const STORAGE_KEY = 'feghr:activeView';

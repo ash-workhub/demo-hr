@@ -52,6 +52,12 @@ export const NAV_ITEMS = [
     icon: 'bell',
     roles: null,
   },
+  {
+    key: 'notices',
+    label: 'Company Notices',
+    icon: 'bell',
+    roles: null,
+  },
 ];
 
 // Returns the nav items visible to a given role.

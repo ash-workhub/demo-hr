@@ -8,6 +8,7 @@ const NOTIFICATION_TYPES = [
   'leave_rejected',
   'leave_cancelled',
   'attendance_reminder',
+  'company_notice',
   'system',
 ];
 

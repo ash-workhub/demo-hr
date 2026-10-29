@@ -192,6 +192,49 @@ export const reviewActionSchema = z.object({
   note: z.string().trim().max(500).optional().default(''),
 });
 
+// --- V2 Step 3: Leave type configuration ---
+export const createLeaveTypeSchema = z.object({
+  code: z.string().trim().min(1, 'Code is required').max(20).transform((s) => s.toLowerCase()),
+  name: z.string().trim().min(1, 'Name is required').max(80),
+  isUnlimited: z.boolean().optional().default(false),
+  defaultQuota: z.number().int().min(0).max(365).optional().default(0),
+  requiresDocumentation: z.boolean().optional().default(false),
+  status: z.enum(['active', 'inactive']).optional().default('active'),
+});
+
+export const updateLeaveTypeSchema = z.object({
+  name: z.string().trim().min(1).max(80).optional(),
+  isUnlimited: z.boolean().optional(),
+  defaultQuota: z.number().int().min(0).max(365).optional(),
+  requiresDocumentation: z.boolean().optional(),
+  status: z.enum(['active', 'inactive']).optional(),
+}).refine((d) => Object.keys(d).length > 0, 'At least one field is required');
+
+// --- V2 Step 3: Leave adjustment (audited ledger entry) ---
+export const createAdjustmentSchema = z.object({
+  employeeId: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid employee id'),
+  leaveTypeCode: z.string().trim().min(1, 'Leave type code is required').max(20).transform((s) => s.toLowerCase()),
+  year: z.number().int().min(2000).max(2100),
+  amount: z.number().refine((v) => v !== 0, 'Amount must be non-zero (signed)'),
+  reason: z.string().trim().min(5, 'Reason must be at least 5 characters').max(500),
+});
+
+// --- V2 Step 3: HR apply-on-behalf (extends createLeaveSchema) ---
+export const createLeaveOnBehalfSchema = z.object({
+  onBehalfOf: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid employee id'),
+  leaveType: z.enum(LEAVE_TYPES),
+  startDate: z.string().refine((v) => !isNaN(Date.parse(v)), 'Invalid start date'),
+  endDate: z.string().refine((v) => !isNaN(Date.parse(v)), 'Invalid end date'),
+  reason: z.string().trim().min(5, 'Reason must be at least 5 characters').max(1000),
+  isHalfDay: z.boolean().optional().default(false),
+}).refine((data) => new Date(data.endDate) >= new Date(data.startDate), {
+  message: 'End date must be on or after start date',
+  path: ['endDate'],
+}).refine((data) => !data.isHalfDay || new Date(data.startDate).toDateString() === new Date(data.endDate).toDateString(), {
+  message: 'Half-day leave requires start and end date to be the same day',
+  path: ['endDate'],
+});
+
 // --- Helpers ---
 /** Validates `body` against a Zod schema; returns { data } or { error }. */
 export function validate(schema, body) {

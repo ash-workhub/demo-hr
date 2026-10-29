@@ -1,10 +1,15 @@
 // src/app/api/leave/route.js
 // GET  /api/leave      — my leave requests + current balances
-// POST /api/leave      — apply for a new leave (self only)
-import { connectDB, LeaveRequest, LeaveBalance, Employee, Notification } from '@/lib/db/index.js';
-import { requireUser, getSessionEmployee } from '@/lib/auth-helpers.js';
-import { createLeaveSchema, validate } from '@/lib/zod-schemas.js';
+// POST /api/leave      — apply for a new leave (self only, OR hr/admin on behalf)
+//
+// V2 Step 3: POST now accepts optional `onBehalfOf` (employeeId). If set,
+// requires hr/admin role. Records HR actor + employee separately. Still enters
+// normal approval route (pending_manager → pending_hr → approved).
+import { connectDB, LeaveRequest, LeaveBalance, LeaveAdjustment, LeaveType, Employee, Notification } from '@/lib/db/index.js';
+import { requireUser, requireRole, getSessionEmployee } from '@/lib/auth-helpers.js';
+import { createLeaveSchema, createLeaveOnBehalfSchema, validate } from '@/lib/zod-schemas.js';
 import { calculateDays, checkBalanceWithReservation, checkOverlap } from '@/lib/leave-engine.js';
+import { checkBalanceV2, sumAdjustments } from '@/lib/leave-balance-engine.js';
 import { createNotification } from '@/lib/notifications.js';
 
 function toSafe(lr, employee) {
@@ -28,6 +33,10 @@ function toSafe(lr, employee) {
       toStatus: h.toStatus,
       at: h.at,
     })),
+    // V2 Step 3 — on-behalf audit
+    appliedBy: lr.appliedBy ? lr.appliedBy.toString() : null,
+    appliedByName: lr.appliedByName || '',
+    appliedOnBehalf: lr.appliedOnBehalf || false,
     createdAt: lr.createdAt,
     updatedAt: lr.updatedAt,
     employee: employee ? {
@@ -129,24 +138,56 @@ export async function POST(request) {
     return Response.json({ error: { _: 'Invalid JSON body' } }, { status: 400 });
   }
 
-  const { data, error } = validate(createLeaveSchema, body);
-  if (error) return Response.json({ error }, { status: 422 });
+  // V2 Step 3 — determine if this is an on-behalf application.
+  const isOnBehalf = !!body.onBehalfOf;
+  let targetEmployee;
+  let appliedBy = null;
+  let appliedByName = '';
+  let appliedOnBehalf = false;
+
+  if (isOnBehalf) {
+    // HR/Admin apply on behalf — require elevated role.
+    try {
+      await requireRole('hr', 'admin');
+    } catch (e) {
+      const status = e instanceof Response ? e.status : 401;
+      return Response.json({ error: status === 403 ? 'Forbidden — only HR/Admin can apply on behalf' : 'Unauthorized' }, { status });
+    }
+    const { data, error } = validate(createLeaveOnBehalfSchema, body);
+    if (error) return Response.json({ error }, { status: 422 });
+    // Use the on-behind schema's data going forward.
+    body = { ...data, leaveType: data.leaveType };
+  } else {
+    const { data, error } = validate(createLeaveSchema, body);
+    if (error) return Response.json({ error }, { status: 422 });
+    body = data;
+  }
 
   await connectDB();
-  const employee = await getSessionEmployee();
-  if (!employee) return Response.json({ error: 'No linked employee record' }, { status: 403 });
+
+  // Resolve the target employee (self, or the on-behalf employee).
+  if (isOnBehalf) {
+    targetEmployee = await Employee.findById(body.onBehalfOf);
+    if (!targetEmployee) return Response.json({ error: { onBehalfOf: 'Employee not found' } }, { status: 422 });
+    appliedBy = user.id;
+    appliedByName = user.name || '';
+    appliedOnBehalf = true;
+  } else {
+    targetEmployee = await getSessionEmployee();
+    if (!targetEmployee) return Response.json({ error: 'No linked employee record' }, { status: 403 });
+  }
 
   // Calculate days (weekdays only, with optional half-day for single-day leaves)
   let days;
   try {
-    days = calculateDays(data.startDate, data.endDate, data.isHalfDay);
+    days = calculateDays(body.startDate, body.endDate, body.isHalfDay);
   } catch (e) {
     return Response.json({ error: { _: e.message } }, { status: 422 });
   }
 
   // --- Overlap check: reject if there's an existing active/approved leave covering the same dates ---
-  const existingLeaves = await LeaveRequest.find({ employeeId: employee._id }).lean();
-  const overlap = checkOverlap(existingLeaves, data.startDate, data.endDate);
+  const existingLeaves = await LeaveRequest.find({ employeeId: targetEmployee._id }).lean();
+  const overlap = checkOverlap(existingLeaves, body.startDate, body.endDate);
   if (overlap.overlaps) {
     const c = overlap.conflictingLeave;
     const fmtStart = new Date(c.startDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -158,47 +199,70 @@ export async function POST(request) {
     }, { status: 422 });
   }
 
-  // Check balance with reservation (pending leaves of the same type reserve balance)
-  const year = new Date(data.startDate).getFullYear();
-  let balance = await LeaveBalance.findOne({ employeeId: employee._id, year });
+  // --- V2 Step 3 balance check: use V2 reconciliation (quota + adjustments - used - pending) ---
+  const year = new Date(body.startDate).getFullYear();
+  let balance = await LeaveBalance.findOne({ employeeId: targetEmployee._id, year });
   if (!balance) {
     // Auto-create a default balance for the year if missing
     balance = await LeaveBalance.create({
-      employeeId: employee._id,
+      employeeId: targetEmployee._id,
       year,
       casual: { total: 10, used: 0 },
       sick: { total: 12, used: 0 },
       earned: { total: 15, used: 0 },
       unpaid: { used: 0 },
+      adjustmentsTotal: { casual: 0, sick: 0, earned: 0, unpaid: 0 },
     });
   }
+
   const pendingLeaves = existingLeaves.filter(
     (l) => l.status === 'pending_manager' || l.status === 'pending_hr'
   );
-  const balCheck = checkBalanceWithReservation(
-    balance.toObject(),
-    data.leaveType,
+
+  // Look up the leave type config (for isUnlimited + defaultQuota).
+  const leaveTypeDoc = await LeaveType.findOne({ company: 'FegHR Demo', code: body.leaveType }).lean();
+  const isUnlimited = leaveTypeDoc?.isUnlimited || body.leaveType === 'unpaid';
+
+  // V2 reconciliation: use adjustments from the ledger.
+  const adjustments = await LeaveAdjustment.find({ employeeId: targetEmployee._id, year }).lean();
+  const adjustmentsTotal = sumAdjustments(adjustments, body.leaveType, year);
+  const bucket = balance[body.leaveType] || {};
+  const quota = bucket.total != null ? bucket.total : (leaveTypeDoc?.defaultQuota || 0);
+  const used = bucket.used || 0;
+  const pendingDays = pendingLeaves
+    .filter((l) => l.leaveType === body.leaveType)
+    .reduce((sum, l) => sum + (l.days || 0), 0);
+
+  const balCheck = checkBalanceV2({
+    quota,
+    adjustmentsTotal,
+    used,
+    pending: pendingDays,
+    isUnlimited,
     days,
-    pendingLeaves
-  );
+  });
   if (!balCheck.ok) {
     return Response.json({ error: { _: balCheck.reason, balance: balCheck.balance } }, { status: 422 });
   }
 
   // Create the leave request — initial state pending_manager
   const lr = await LeaveRequest.create({
-    employeeId: employee._id,
-    leaveType: data.leaveType,
-    startDate: new Date(data.startDate),
-    endDate: new Date(data.endDate),
+    employeeId: targetEmployee._id,
+    leaveType: body.leaveType,
+    startDate: new Date(body.startDate),
+    endDate: new Date(body.endDate),
     days,
-    reason: data.reason,
+    reason: body.reason,
     status: 'pending_manager',
-    currentApproverRole: employee.managerId ? 'manager' : 'hr', // skip manager if no manager
+    currentApproverRole: targetEmployee.managerId ? 'manager' : 'hr', // skip manager if no manager
+    // V2 Step 3 — on-behalf audit
+    appliedBy,
+    appliedByName,
+    appliedOnBehalf,
     history: [{
       action: 'submitted',
-      byRole: 'employee',
-      note: '',
+      byRole: isOnBehalf ? user.role : 'employee',
+      note: isOnBehalf ? `Applied on behalf by ${appliedByName} (${user.role})` : '',
       fromStatus: '',
       toStatus: 'pending_manager',
       at: new Date(),
@@ -206,17 +270,18 @@ export async function POST(request) {
   });
 
   // Notify the manager (if any) that there's a new leave to approve
-  if (employee.managerId) {
+  if (targetEmployee.managerId) {
     try {
       const { User } = await import('@/lib/db/index.js');
       // User.employeeId is stored as a string (Better Auth), so cast ObjectId to string.
-      const mgrUser = await User.findOne({ employeeId: employee.managerId.toString() }).lean();
+      const mgrUser = await User.findOne({ employeeId: targetEmployee.managerId.toString() }).lean();
       if (mgrUser) {
+        const onBehalfPrefix = isOnBehalf ? '[On behalf] ' : '';
         await createNotification({
           userId: mgrUser._id,
           type: 'leave_submitted',
-          title: 'New leave request',
-          message: `${employee.firstName} ${employee.lastName} requested ${days} day(s) of ${data.leaveType} leave`,
+          title: `${onBehalfPrefix}New leave request`,
+          message: `${targetEmployee.firstName} ${targetEmployee.lastName} requested ${days} day(s) of ${body.leaveType} leave`,
           link: 'approvals',
           relatedId: lr._id,
         });
@@ -227,5 +292,5 @@ export async function POST(request) {
     }
   }
 
-  return Response.json(toSafe(lr, employee), { status: 201 });
+  return Response.json(toSafe(lr, targetEmployee), { status: 201 });
 }

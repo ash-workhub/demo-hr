@@ -50,6 +50,12 @@ const leaveRequestSchema = new mongoose.Schema(
     managerAction: { type: actionSchema, default: null },
     hrAction: { type: actionSchema, default: null },
     history: { type: [historySchema], default: [] },
+    // V2 Step 3 — HR apply-on-behalf audit. Null/absent for self-applied leaves.
+    // When HR applies on behalf of an employee, appliedBy records the HR actor
+    // (separate from employeeId which records the employee). appliedOnBehalf=true.
+    appliedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    appliedByName: { type: String, default: '' },
+    appliedOnBehalf: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

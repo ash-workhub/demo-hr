@@ -17,3 +17,6 @@ export { default as Holiday } from './models/Holiday.js';
 export { default as EmployeeSchedule } from './models/EmployeeSchedule.js';
 export { default as AttendanceCorrection, CORRECTION_STATUS } from './models/AttendanceCorrection.js';
 export { default as AttendanceReview, REVIEW_VERDICT, FLAG_SEVERITY } from './models/AttendanceReview.js';
+// V2 Step 3 — leave type config + adjustment ledger
+export { default as LeaveType } from './models/LeaveType.js';
+export { default as LeaveAdjustment } from './models/LeaveAdjustment.js';

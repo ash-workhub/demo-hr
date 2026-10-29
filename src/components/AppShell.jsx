@@ -8,6 +8,7 @@ import Topbar from './Topbar.jsx';
 import { navForRole, defaultViewForRole, ALL_VIEW_KEYS } from '@/lib/nav.js';
 import DashboardView from './views/DashboardView.jsx';
 import DirectoryView from './views/DirectoryView.jsx';
+import OrganizationView from './views/OrganizationView.jsx';
 import AttendanceView from './views/AttendanceView.jsx';
 import LeaveView from './views/LeaveView.jsx';
 import ApprovalsView from './views/ApprovalsView.jsx';
@@ -16,6 +17,7 @@ import NotificationsView from './views/NotificationsView.jsx';
 const VIEWS = {
   dashboard: DashboardView,
   directory: DirectoryView,
+  organization: OrganizationView,
   attendance: AttendanceView,
   leave: LeaveView,
   approvals: ApprovalsView,
@@ -25,6 +27,7 @@ const VIEWS = {
 const VIEW_TITLES = {
   dashboard: 'Dashboard',
   directory: 'Employee Directory',
+  organization: 'Organization',
   attendance: 'Daily Attendance',
   leave: 'Leave Requests',
   approvals: 'Approvals',

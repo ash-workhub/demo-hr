@@ -64,6 +64,18 @@ export function CheckIcon({ className, size }) {
   );
 }
 
+export function BuildingIcon({ className, size }) {
+  return (
+    <svg {...base(size)} className={className} aria-hidden="true">
+      <rect x="4" y="2" width="16" height="20" rx="2" />
+      <line x1="9" y1="22" x2="9" y2="2" />
+      <line x1="15" y1="22" x2="15" y2="2" />
+      <line x1="4" y1="10" x2="20" y2="10" />
+      <line x1="4" y1="16" x2="20" y2="16" />
+    </svg>
+  );
+}
+
 export function BellIcon({ className, size }) {
   return (
     <svg {...base(size)} className={className} aria-hidden="true">
@@ -109,6 +121,7 @@ const ICONS = {
   calendar: CalendarIcon,
   check: CheckIcon,
   bell: BellIcon,
+  building: BuildingIcon,
 };
 
 export function NavIcon({ name, className, size }) {

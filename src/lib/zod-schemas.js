@@ -63,6 +63,61 @@ export const attendanceActionSchema = z.object({
   notes: z.string().trim().max(500).optional().default(''),
 });
 
+// --- V2 Step 1: Organization reference records ---
+
+export const createBranchSchema = z.object({
+  code: z.string().trim().min(1, 'Code is required').max(20).transform((s) => s.toUpperCase()),
+  name: z.string().trim().min(1, 'Name is required').max(80),
+  address: z.string().trim().max(200).optional().default(''),
+  status: z.enum(['active', 'inactive']).optional().default('active'),
+});
+
+export const updateBranchSchema = z.object({
+  code: z.string().trim().min(1).max(20).transform((s) => s.toUpperCase()).optional(),
+  name: z.string().trim().min(1).max(80).optional(),
+  address: z.string().trim().max(200).optional(),
+  status: z.enum(['active', 'inactive']).optional(),
+}).refine((data) => Object.keys(data).length > 0, 'At least one field is required');
+
+export const createDepartmentSchema = z.object({
+  code: z.string().trim().min(1, 'Code is required').max(20).transform((s) => s.toUpperCase()),
+  name: z.string().trim().min(1, 'Name is required').max(80),
+  branchId: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid branch id').optional().nullable(),
+  status: z.enum(['active', 'inactive']).optional().default('active'),
+});
+
+export const updateDepartmentSchema = z.object({
+  code: z.string().trim().min(1).max(20).transform((s) => s.toUpperCase()).optional(),
+  name: z.string().trim().min(1).max(80).optional(),
+  branchId: z.string().regex(/^[0-9a-fA-F]{24}$/).optional().nullable(),
+  status: z.enum(['active', 'inactive']).optional(),
+}).refine((data) => Object.keys(data).length > 0, 'At least one field is required');
+
+export const createDesignationSchema = z.object({
+  code: z.string().trim().min(1, 'Code is required').max(20).transform((s) => s.toUpperCase()),
+  name: z.string().trim().min(1, 'Name is required').max(80),
+  departmentId: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid department id').optional().nullable(),
+  status: z.enum(['active', 'inactive']).optional().default('active'),
+});
+
+export const updateDesignationSchema = z.object({
+  code: z.string().trim().min(1).max(20).transform((s) => s.toUpperCase()).optional(),
+  name: z.string().trim().min(1).max(80).optional(),
+  departmentId: z.string().regex(/^[0-9a-fA-F]{24}$/).optional().nullable(),
+  status: z.enum(['active', 'inactive']).optional(),
+}).refine((data) => Object.keys(data).length > 0, 'At least one field is required');
+
+// --- V2 Step 1: Employee assignment (effective-dated movement) ---
+export const createAssignmentSchema = z.object({
+  employeeId: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid employee id'),
+  branchId: z.string().regex(/^[0-9a-fA-F]{24}$/).optional().nullable(),
+  departmentId: z.string().regex(/^[0-9a-fA-F]{24}$/).optional().nullable(),
+  designationId: z.string().regex(/^[0-9a-fA-F]{24}$/).optional().nullable(),
+  managerId: z.string().regex(/^[0-9a-fA-F]{24}$/).optional().nullable(),
+  effectiveDate: z.string().refine((v) => !isNaN(Date.parse(v)), 'Invalid effective date'),
+  reason: z.string().trim().max(500).optional().default(''),
+}).refine((data) => data.effectiveDate, { message: 'Effective date is required', path: ['effectiveDate'] });
+
 // --- Helpers ---
 /** Validates `body` against a Zod schema; returns { data } or { error }. */
 export function validate(schema, body) {

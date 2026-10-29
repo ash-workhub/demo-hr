@@ -59,6 +59,10 @@ export async function GET(request) {
     phone: e.phone,
     department: e.department,
     designation: e.designation,
+    // V2 Step 1 — optional reference IDs
+    branchId: e.branchId ? e.branchId.toString() : null,
+    departmentId: e.departmentId ? e.departmentId.toString() : null,
+    designationId: e.designationId ? e.designationId.toString() : null,
     role: e.role,
     status: e.status,
     joinDate: e.joinDate,

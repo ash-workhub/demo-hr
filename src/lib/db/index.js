@@ -6,3 +6,8 @@ export { default as LeaveRequest, LEAVE_STATUS, LEAVE_TYPES } from './models/Lea
 export { default as LeaveBalance } from './models/LeaveBalance.js';
 export { default as Notification, NOTIFICATION_TYPES } from './models/Notification.js';
 export { default as User } from './models/User.js';
+// V2 Step 1 — org reference records + assignment history
+export { default as Branch } from './models/Branch.js';
+export { default as Department } from './models/Department.js';
+export { default as Designation } from './models/Designation.js';
+export { default as EmployeeAssignment } from './models/EmployeeAssignment.js';

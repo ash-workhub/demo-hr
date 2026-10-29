@@ -135,12 +135,13 @@ function ApprovalCard({ lr, user, acting, onApprove, onReject }) {
     setShowNote(true);
   }
 
-  function confirmAction() {
-    if (pendingDecision === 'approve') onApprove(note);
-    else onReject(note);
+  async function confirmAction() {
+    const decision = pendingDecision;
     setShowNote(false);
     setNote('');
     setPendingDecision(null);
+    if (decision === 'approve') await onApprove(note);
+    else await onReject(note);
   }
 
   function cancelAction() {
@@ -188,17 +189,17 @@ function ApprovalCard({ lr, user, acting, onApprove, onReject }) {
                 <button
                   type="button"
                   onClick={confirmAction}
-                  disabled={acting}
+                  disabled={acting === lr.id}
                   className={`px-3 py-1.5 rounded-md text-xs font-semibold text-white disabled:opacity-60 ${
                     pendingDecision === 'approve' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700'
                   }`}
                 >
-                  {acting ? 'Processing…' : `Confirm ${pendingDecision}`}
+                  {acting === lr.id ? 'Processing…' : `Confirm ${pendingDecision}`}
                 </button>
                 <button
                   type="button"
                   onClick={cancelAction}
-                  disabled={acting}
+                  disabled={acting === lr.id}
                   className="px-3 py-1.5 rounded-md border border-slate-200 text-slate-700 text-xs font-medium hover:bg-slate-50 disabled:opacity-60"
                 >
                   Cancel
@@ -210,7 +211,7 @@ function ApprovalCard({ lr, user, acting, onApprove, onReject }) {
               <button
                 type="button"
                 onClick={() => startAction('approve')}
-                disabled={acting}
+                disabled={!!acting}
                 className="px-3 py-1.5 rounded-md bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 disabled:opacity-60"
               >
                 Approve
@@ -218,7 +219,7 @@ function ApprovalCard({ lr, user, acting, onApprove, onReject }) {
               <button
                 type="button"
                 onClick={() => startAction('reject')}
-                disabled={acting}
+                disabled={!!acting}
                 className="px-3 py-1.5 rounded-md bg-rose-600 text-white text-xs font-semibold hover:bg-rose-700 disabled:opacity-60"
               >
                 Reject

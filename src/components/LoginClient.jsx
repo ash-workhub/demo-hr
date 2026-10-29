@@ -43,13 +43,15 @@ export default function LoginClient({ demoAccounts = [] }) {
       // sees feedback during the (sometimes slow) dev recompile.
       setPhase('redirecting');
       router.refresh();
-      // Fallback: if router.refresh() didn't swap the page within 4s (e.g. due to
-      // a dev recompile stall or cookie timing), force a full reload.
+      // Fallback: if router.refresh() didn't swap the page within 8s (e.g. due to
+      // a cold dev recompile which can take 5s+ on first hit), force a full reload.
+      // 8s is well above the worst observed cold-compile time (~5s) so this only
+      // fires on genuine stalls, not normal slow compiles.
       setTimeout(() => {
         if (document.cookie.includes('better-auth.session_token')) {
           window.location.reload();
         }
-      }, 4000);
+      }, 8000);
     } catch (err) {
       setError(err.message || 'Network error');
       setLoading(false);

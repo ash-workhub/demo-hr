@@ -43,8 +43,12 @@ export const createLeaveSchema = z.object({
   startDate: z.string().refine((v) => !isNaN(Date.parse(v)), 'Invalid start date'),
   endDate: z.string().refine((v) => !isNaN(Date.parse(v)), 'Invalid end date'),
   reason: z.string().trim().min(5, 'Reason must be at least 5 characters').max(1000),
+  isHalfDay: z.boolean().optional().default(false),
 }).refine((data) => new Date(data.endDate) >= new Date(data.startDate), {
   message: 'End date must be on or after start date',
+  path: ['endDate'],
+}).refine((data) => !data.isHalfDay || new Date(data.startDate).toDateString() === new Date(data.endDate).toDateString(), {
+  message: 'Half-day leave requires start and end date to be the same day',
   path: ['endDate'],
 });
 

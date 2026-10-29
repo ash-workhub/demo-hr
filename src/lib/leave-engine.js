@@ -35,12 +35,13 @@ export function isFinal(status) {
 
 /**
  * Calculate the number of leave days between two dates (inclusive), excluding weekends.
- * Half-day is not supported via date range — set days manually if needed.
+ * If `isHalfDay` is true and the range is a single weekday, returns 0.5.
  * @param {string|Date} startDate
  * @param {string|Date} endDate
- * @returns {number} integer >= 1
+ * @param {boolean} isHalfDay - only applies when start === end (single day)
+ * @returns {number} >= 0.5
  */
-export function calculateDays(startDate, endDate) {
+export function calculateDays(startDate, endDate, isHalfDay = false) {
   const start = new Date(startDate);
   const end = new Date(endDate);
   if (isNaN(start) || isNaN(end)) throw new Error('Invalid date(s)');
@@ -57,6 +58,8 @@ export function calculateDays(startDate, endDate) {
     if (dow !== 0 && dow !== 6) days++;
     cursor.setDate(cursor.getDate() + 1);
   }
+  // Half-day only valid for a single weekday.
+  if (isHalfDay && days === 1) return 0.5;
   // Minimum 0.5 days (allow half-day via date math even if weekend-only).
   return Math.max(0.5, days);
 }
@@ -159,6 +162,103 @@ export function transition(currentStatus, action, actorRole) {
 export function nextApproverRole(status) {
   if (!isActive(status)) return null;
   return APPROVER_ROLE[status]; // 'manager' or 'hr'
+}
+
+/**
+ * Checks a proposed leave against existing leaves for date overlap.
+ * Two date ranges [s1, e1] and [s2, e2] overlap iff s1 <= e2 AND s2 <= e1.
+ *
+ * Only leaves in active or approved states block new submissions — rejected
+ * and cancelled leaves don't count.
+ *
+ * @param {Array} existingLeaves - array of leave docs with {startDate, endDate, status}
+ * @param {string|Date} newStart
+ * @param {string|Date} newEnd
+ * @returns {{ overlaps: boolean, conflictingLeave?: object }}
+ */
+export function checkOverlap(existingLeaves, newStart, newEnd) {
+  const ns = new Date(newStart); ns.setHours(0, 0, 0, 0);
+  const ne = new Date(newEnd); ne.setHours(0, 0, 0, 0);
+
+  for (const lv of existingLeaves) {
+    if (!isActive(lv.status) && lv.status !== 'approved') continue;
+    const ls = new Date(lv.startDate); ls.setHours(0, 0, 0, 0);
+    const le = new Date(lv.endDate); le.setHours(0, 0, 0, 0);
+    // Overlap iff ns <= le AND ls <= ne
+    if (ns <= le && ls <= ne) {
+      return {
+        overlaps: true,
+        conflictingLeave: {
+          id: lv._id ? lv._id.toString() : lv.id,
+          status: lv.status,
+          startDate: lv.startDate,
+          endDate: lv.endDate,
+        },
+      };
+    }
+  }
+  return { overlaps: false };
+}
+
+/**
+ * Computes the total days currently "reserved" by pending leaves of the same type.
+ * Pending leaves (pending_manager / pending_hr) reserve balance so an employee
+ * can't submit two 5-day leaves when only 5 days remain.
+ *
+ * @param {Array} pendingLeaves - array of pending leave docs with {leaveType, days}
+ * @param {string} leaveType
+ * @returns {number} total reserved days
+ */
+export function reservedDays(pendingLeaves, leaveType) {
+  // Unpaid leave has no cap — no reservation needed.
+  if (leaveType === 'unpaid') return 0;
+  return pendingLeaves
+    .filter((l) => l.leaveType === leaveType)
+    .reduce((sum, l) => sum + (l.days || 0), 0);
+}
+
+/**
+ * Check balance accounting for both `used` (approved) AND pending reservations.
+ * Returns { ok: true } or { ok: false, reason, ... }.
+ *
+ * @param {object} balance - LeaveBalance doc
+ * @param {string} leaveType
+ * @param {number} days - requested days
+ * @param {Array} pendingLeaves - pending leave docs of the same employee (for reservation calc)
+ */
+export function checkBalanceWithReservation(balance, leaveType, days, pendingLeaves = []) {
+  if (!LEAVE_TYPES.includes(leaveType)) {
+    return { ok: false, reason: `Invalid leave type: ${leaveType}` };
+  }
+  if (typeof days !== 'number' || days <= 0) {
+    return { ok: false, reason: 'Days must be a positive number' };
+  }
+
+  if (leaveType === 'unpaid') {
+    return { ok: true, balance: { used: balance?.unpaid?.used || 0 }, requested: days };
+  }
+
+  const bucket = balance?.[leaveType];
+  if (!bucket) return { ok: false, reason: `No balance record for ${leaveType}` };
+
+  const used = bucket.used || 0;
+  const reserved = reservedDays(pendingLeaves, leaveType);
+  const total = bucket.total || 0;
+  const available = total - used - reserved;
+
+  if (available < days) {
+    return {
+      ok: false,
+      reason: `Insufficient ${leaveType} balance: ${available} day(s) available (${used} used, ${reserved} pending), ${days} requested`,
+      balance: { total, used, reserved, available },
+      requested: days,
+    };
+  }
+  return {
+    ok: true,
+    balance: { total, used, reserved, available },
+    requested: days,
+  };
 }
 
 /**

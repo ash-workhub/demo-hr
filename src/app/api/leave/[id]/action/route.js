@@ -4,6 +4,7 @@ import { connectDB, LeaveRequest, LeaveBalance, Employee, Notification, User } f
 import { requireUser, getSessionEmployee } from '@/lib/auth-helpers.js';
 import { leaveActionSchema, validate } from '@/lib/zod-schemas.js';
 import { transition, isActive, applyApprovalToBalance } from '@/lib/leave-engine.js';
+import { createNotification } from '@/lib/notifications.js';
 
 function toSafe(lr, employee) {
   return {
@@ -69,6 +70,12 @@ export async function POST(request, { params }) {
   // At pending_hr, only HR (or admin) can act.
   const employee = await getSessionEmployee();
   const owner = await Employee.findById(lr.employeeId).lean();
+
+  // Self-approval block: the leave owner cannot act on their own leave, even if they
+  // happen to be HR or an admin. This prevents an HR user from approving their own leave.
+  if (employee && owner && employee._id.toString() === owner._id.toString()) {
+    return Response.json({ error: 'Forbidden — you cannot approve or reject your own leave request' }, { status: 403 });
+  }
 
   if (lr.status === 'pending_manager') {
     const isDirectManager = employee && owner.managerId && owner.managerId.toString() === employee._id.toString();
@@ -153,14 +160,13 @@ export async function POST(request, { params }) {
         title = 'Leave rejected';
         message = `Your ${lr.leaveType} leave was rejected${data.note ? `: ${data.note}` : ''}`;
       }
-      await Notification.create({
+      await createNotification({
         userId: ownerUser._id,
         type,
         title,
         message,
         link: 'leave',
         relatedId: lr._id,
-        read: false,
       });
     }
   } catch (e) {

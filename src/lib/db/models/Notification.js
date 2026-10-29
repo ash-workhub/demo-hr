@@ -25,6 +25,13 @@ const notificationSchema = new mongoose.Schema(
 );
 
 notificationSchema.index({ userId: 1, read: 1, createdAt: -1 });
+// Dedup index: prevent duplicate notifications for the same user + type + related entity.
+// `partialFilterExpression` makes the index apply only when relatedId is set, so
+// system-wide notifications (no relatedId) aren't constrained.
+notificationSchema.index(
+  { userId: 1, type: 1, relatedId: 1 },
+  { unique: true, partialFilterExpression: { relatedId: { $type: 'objectId' } } }
+);
 
 export default mongoose.models.Notification || mongoose.model('Notification', notificationSchema);
 export { NOTIFICATION_TYPES };

@@ -110,8 +110,6 @@ export async function POST(request) {
 
   await connectDB();
 
-  // Uniqueness checks (Mongoose will also enforce via unique index, but we want friendly errors).
-  const existingByEmployeeId = await Employee.findOne({ employeeId: data.email }); // placeholder
   // Generate a sequential employeeId (FEG-XXX) — not user-supplied.
   const lastEmp = await Employee.findOne().sort({ employeeId: -1 }).lean();
   let nextNum = 11; // start after seed (FEG-010)
@@ -120,10 +118,14 @@ export async function POST(request) {
   }
   const employeeId = `FEG-${String(nextNum).padStart(3, '0')}`;
 
-  // Validate managerId exists + is a manager/hr/admin if provided.
+  // Validate managerId: must exist AND have role manager/hr/admin (can't set a regular
+  // employee as someone's manager).
   if (data.managerId) {
     const mgr = await Employee.findById(data.managerId).lean();
     if (!mgr) return Response.json({ error: { managerId: 'Manager not found' } }, { status: 422 });
+    if (!['manager', 'hr', 'admin'].includes(mgr.role)) {
+      return Response.json({ error: { managerId: `Selected employee has role '${mgr.role}' — only manager/hr/admin can be managers` } }, { status: 422 });
+    }
   }
 
   try {

@@ -4,7 +4,8 @@
 import { connectDB, LeaveRequest, LeaveBalance, Employee, Notification } from '@/lib/db/index.js';
 import { requireUser, getSessionEmployee } from '@/lib/auth-helpers.js';
 import { createLeaveSchema, validate } from '@/lib/zod-schemas.js';
-import { calculateDays, checkBalance } from '@/lib/leave-engine.js';
+import { calculateDays, checkBalanceWithReservation, checkOverlap } from '@/lib/leave-engine.js';
+import { createNotification } from '@/lib/notifications.js';
 
 function toSafe(lr, employee) {
   return {
@@ -135,15 +136,29 @@ export async function POST(request) {
   const employee = await getSessionEmployee();
   if (!employee) return Response.json({ error: 'No linked employee record' }, { status: 403 });
 
-  // Calculate days (weekdays only)
+  // Calculate days (weekdays only, with optional half-day for single-day leaves)
   let days;
   try {
-    days = calculateDays(data.startDate, data.endDate);
+    days = calculateDays(data.startDate, data.endDate, data.isHalfDay);
   } catch (e) {
     return Response.json({ error: { _: e.message } }, { status: 422 });
   }
 
-  // Check balance (before submitting — reject early if insufficient)
+  // --- Overlap check: reject if there's an existing active/approved leave covering the same dates ---
+  const existingLeaves = await LeaveRequest.find({ employeeId: employee._id }).lean();
+  const overlap = checkOverlap(existingLeaves, data.startDate, data.endDate);
+  if (overlap.overlaps) {
+    const c = overlap.conflictingLeave;
+    const fmtStart = new Date(c.startDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    const fmtEnd = new Date(c.endDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    return Response.json({
+      error: {
+        _: `Leave overlaps with an existing ${c.status.replace('_', ' ')} leave (${fmtStart} → ${fmtEnd})`,
+      },
+    }, { status: 422 });
+  }
+
+  // Check balance with reservation (pending leaves of the same type reserve balance)
   const year = new Date(data.startDate).getFullYear();
   let balance = await LeaveBalance.findOne({ employeeId: employee._id, year });
   if (!balance) {
@@ -157,10 +172,14 @@ export async function POST(request) {
       unpaid: { used: 0 },
     });
   }
-  const balCheck = checkBalance(
+  const pendingLeaves = existingLeaves.filter(
+    (l) => l.status === 'pending_manager' || l.status === 'pending_hr'
+  );
+  const balCheck = checkBalanceWithReservation(
     balance.toObject(),
     data.leaveType,
-    days
+    days,
+    pendingLeaves
   );
   if (!balCheck.ok) {
     return Response.json({ error: { _: balCheck.reason, balance: balCheck.balance } }, { status: 422 });
@@ -193,14 +212,13 @@ export async function POST(request) {
       // User.employeeId is stored as a string (Better Auth), so cast ObjectId to string.
       const mgrUser = await User.findOne({ employeeId: employee.managerId.toString() }).lean();
       if (mgrUser) {
-        await Notification.create({
+        await createNotification({
           userId: mgrUser._id,
           type: 'leave_submitted',
           title: 'New leave request',
           message: `${employee.firstName} ${employee.lastName} requested ${days} day(s) of ${data.leaveType} leave`,
           link: 'approvals',
           relatedId: lr._id,
-          read: false,
         });
       }
     } catch (e) {

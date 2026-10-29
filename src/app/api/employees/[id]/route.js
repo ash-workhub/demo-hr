@@ -81,10 +81,13 @@ export async function PATCH(request, { params }) {
     return Response.json({ error: { managerId: 'Employee cannot be their own manager' } }, { status: 422 });
   }
 
-  // Validate manager exists if provided.
+  // Validate manager: must exist AND have role manager/hr/admin.
   if (data.managerId) {
     const mgr = await Employee.findById(data.managerId).lean();
     if (!mgr) return Response.json({ error: { managerId: 'Manager not found' } }, { status: 422 });
+    if (!['manager', 'hr', 'admin'].includes(mgr.role)) {
+      return Response.json({ error: { managerId: `Selected employee has role '${mgr.role}' — only manager/hr/admin can be managers` } }, { status: 422 });
+    }
   }
 
   // Apply only the provided fields.

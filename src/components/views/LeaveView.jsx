@@ -112,6 +112,7 @@ function ApplyForm({ balance, onApplied }) {
     startDate: '',
     endDate: '',
     reason: '',
+    isHalfDay: false,
   });
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
@@ -120,6 +121,9 @@ function ApplyForm({ balance, onApplied }) {
   function set(k, v) {
     setForm((f) => ({ ...f, [k]: v }));
   }
+
+  // Derived: whether start === end (single day) — enables the half-day checkbox.
+  const isSingleDay = form.startDate && form.endDate && form.startDate === form.endDate;
 
   // Auto-set endDate = startDate when the user picks a start date and hasn't set an end yet.
   // setState-in-effect is intentional here: we're synchronizing endDate to startDate
@@ -147,7 +151,7 @@ function ApplyForm({ balance, onApplied }) {
         setErrors(data.error || { _: 'Failed to submit' });
       } else {
         setSuccess(`Leave request submitted — ${data.days} day(s). Status: ${data.status.replace('_', ' ')}`);
-        setForm({ leaveType: 'casual', startDate: '', endDate: '', reason: '' });
+        setForm({ leaveType: 'casual', startDate: '', endDate: '', reason: '', isHalfDay: false });
         onApplied();
       }
     } catch (err) {
@@ -198,6 +202,19 @@ function ApplyForm({ balance, onApplied }) {
           />
         </div>
       </div>
+
+      {/* Half-day toggle: only enabled when start === end (single day) */}
+      <label className={`flex items-center gap-2 text-sm ${isSingleDay ? 'text-slate-700' : 'text-slate-400'}`}>
+        <input
+          type="checkbox"
+          checked={form.isHalfDay}
+          onChange={(e) => set('isHalfDay', e.target.checked)}
+          disabled={!isSingleDay}
+          className="rounded border-slate-300 text-violet-600 focus:ring-violet-200"
+        />
+        Half-day leave
+        {!isSingleDay && <span className="text-xs text-slate-400">(only available for single-day leaves)</span>}
+      </label>
 
       <div>
         <label className="block text-xs font-medium text-slate-500 mb-1">Reason</label>

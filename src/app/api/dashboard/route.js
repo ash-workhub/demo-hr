@@ -120,7 +120,9 @@ export async function GET() {
     for (const r of todayRecords) {
       if (summary[r.status] !== undefined) summary[r.status]++;
     }
-    summary.absent = reports.length - summary.present - summary.late - summary.leave;
+    // V2 Step 6: expose attended (present + late) as a single total for reporting.
+    summary.attended = summary.present + summary.late;
+    summary.absent = reports.length - summary.attended - summary.leave;
 
     // Team leave usage this year
     const year = new Date().getFullYear();
@@ -186,7 +188,9 @@ export async function GET() {
   for (const r of todayRecords) {
     if (companySummary[r.status] !== undefined) companySummary[r.status]++;
   }
-  companySummary.absent = allEmployees.length - companySummary.present - companySummary.late - companySummary.leave;
+  // V2 Step 6: expose attended (present + late) as a single total for reporting.
+  companySummary.attended = companySummary.present + companySummary.late;
+  companySummary.absent = allEmployees.length - companySummary.attended - companySummary.leave;
 
   // Headcount by department
   const deptCounts = {};

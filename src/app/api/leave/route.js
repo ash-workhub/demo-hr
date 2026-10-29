@@ -5,11 +5,12 @@
 // V2 Step 3: POST now accepts optional `onBehalfOf` (employeeId). If set,
 // requires hr/admin role. Records HR actor + employee separately. Still enters
 // normal approval route (pending_manager → pending_hr → approved).
-import { connectDB, LeaveRequest, LeaveBalance, LeaveAdjustment, LeaveType, Employee, Notification } from '@/lib/db/index.js';
+import { connectDB, LeaveRequest, LeaveBalance, LeaveAdjustment, LeaveType, ApprovalPolicy, Employee, Notification } from '@/lib/db/index.js';
 import { requireUser, requireRole, getSessionEmployee } from '@/lib/auth-helpers.js';
 import { createLeaveSchema, createLeaveOnBehalfSchema, validate } from '@/lib/zod-schemas.js';
 import { calculateDays, checkBalanceWithReservation, checkOverlap } from '@/lib/leave-engine.js';
 import { checkBalanceV2, sumAdjustments } from '@/lib/leave-balance-engine.js';
+import { resolveRoute, buildManagementChain } from '@/lib/approval-policy-engine.js';
 import { createNotification } from '@/lib/notifications.js';
 
 function toSafe(lr, employee) {
@@ -37,6 +38,10 @@ function toSafe(lr, employee) {
     appliedBy: lr.appliedBy ? lr.appliedBy.toString() : null,
     appliedByName: lr.appliedByName || '',
     appliedOnBehalf: lr.appliedOnBehalf || false,
+    // V2 Step 4 — route snapshot + current stage
+    routeSnapshot: lr.routeSnapshot || [],
+    currentStage: lr.currentStage,
+    reassignmentHistory: lr.reassignmentHistory || [],
     createdAt: lr.createdAt,
     updatedAt: lr.updatedAt,
     employee: employee ? {
@@ -245,7 +250,54 @@ export async function POST(request) {
     return Response.json({ error: { _: balCheck.reason, balance: balCheck.balance } }, { status: 422 });
   }
 
-  // Create the leave request — initial state pending_manager
+  // V2 Step 4 — resolve the approval route from the active policy + snapshot it.
+  // This snapshot is FROZEN — policy edits after submission don't affect pending requests.
+  const activePolicy = await ApprovalPolicy.findOne({ company: 'FegHR Demo', endDate: null, status: 'active' }).lean();
+  let routeSnapshot = [];
+  let currentStage = null;
+
+  if (activePolicy) {
+    // Build the management chain by walking up from the target employee.
+    const allManagers = await Employee.find({ status: 'active' }).select('_id firstName lastName role status managerId').lean();
+    const employeeMap = new Map(allManagers.map((e) => [e._id.toString(), e]));
+    const managementChain = buildManagementChain(targetEmployee, employeeMap);
+
+    const routeResult = resolveRoute({
+      employeeId: targetEmployee._id.toString(),
+      managementChain,
+      policy: activePolicy,
+    });
+
+    if (routeResult.error) {
+      return Response.json({ error: { _: `Approval route error: ${routeResult.error}` } }, { status: 422 });
+    }
+
+    routeSnapshot = routeResult.route;
+    currentStage = 0; // start at the first stage
+  }
+  // If no active policy, V1 fallback: routeSnapshot stays empty, currentStage stays null.
+  // The V1 hardcoded pending_manager → pending_hr flow handles these requests.
+
+  // V1 compat: determine the initial status + currentApproverRole.
+  // For V2 requests with routeSnapshot, use the first stage's type.
+  // For V1 fallback, use the original logic.
+  let initialStatus, initialApproverRole;
+  if (routeSnapshot.length > 0) {
+    const firstStage = routeSnapshot[0];
+    if (firstStage.type === 'hr_admin') {
+      initialStatus = 'pending_hr';
+      initialApproverRole = firstStage.approverRole;
+    } else {
+      initialStatus = 'pending_manager';
+      initialApproverRole = 'manager';
+    }
+  } else {
+    // V1 fallback
+    initialStatus = 'pending_manager';
+    initialApproverRole = targetEmployee.managerId ? 'manager' : 'hr';
+  }
+
+  // Create the leave request
   const lr = await LeaveRequest.create({
     employeeId: targetEmployee._id,
     leaveType: body.leaveType,
@@ -253,18 +305,22 @@ export async function POST(request) {
     endDate: new Date(body.endDate),
     days,
     reason: body.reason,
-    status: 'pending_manager',
-    currentApproverRole: targetEmployee.managerId ? 'manager' : 'hr', // skip manager if no manager
+    status: initialStatus,
+    currentApproverRole: initialApproverRole,
     // V2 Step 3 — on-behalf audit
     appliedBy,
     appliedByName,
     appliedOnBehalf,
+    // V2 Step 4 — frozen route snapshot
+    routeSnapshot,
+    currentStage,
+    reassignmentHistory: [],
     history: [{
       action: 'submitted',
       byRole: isOnBehalf ? user.role : 'employee',
       note: isOnBehalf ? `Applied on behalf by ${appliedByName} (${user.role})` : '',
       fromStatus: '',
-      toStatus: 'pending_manager',
+      toStatus: initialStatus,
       at: new Date(),
     }],
   });

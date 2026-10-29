@@ -56,6 +56,15 @@ const leaveRequestSchema = new mongoose.Schema(
     appliedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     appliedByName: { type: String, default: '' },
     appliedOnBehalf: { type: Boolean, default: false },
+    // V2 Step 4 — approval route snapshot (frozen at submission).
+    // Each entry: { stage, type, approverId, approverName, status, decidedAt, decidedBy, note }
+    // status per stage: 'pending' | 'approved' | 'rejected'
+    routeSnapshot: { type: Array, default: [] },
+    // Current stage index into routeSnapshot. null for V1 requests (no snapshot).
+    currentStage: { type: Number, default: null },
+    // V2 Step 4 — append-only reassignment audit.
+    // Each entry: { stage, fromApproverId, toApproverId, reason, by, byName, at }
+    reassignmentHistory: { type: Array, default: [] },
   },
   { timestamps: true }
 );

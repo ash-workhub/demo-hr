@@ -20,3 +20,5 @@ export { default as AttendanceReview, REVIEW_VERDICT, FLAG_SEVERITY } from './mo
 // V2 Step 3 — leave type config + adjustment ledger
 export { default as LeaveType } from './models/LeaveType.js';
 export { default as LeaveAdjustment } from './models/LeaveAdjustment.js';
+// V2 Step 4 — configurable approval policies
+export { default as ApprovalPolicy } from './models/ApprovalPolicy.js';

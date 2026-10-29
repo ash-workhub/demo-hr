@@ -235,6 +235,30 @@ export const createLeaveOnBehalfSchema = z.object({
   path: ['endDate'],
 });
 
+// --- V2 Step 4: Approval policy ---
+export const createApprovalPolicySchema = z.object({
+  name: z.string().trim().min(1, 'Name is required').max(80),
+  effectiveDate: z.string().refine((v) => !isNaN(Date.parse(v)), 'Invalid effective date'),
+  managerStages: z.number().int().min(0, 'Must be 0-5').max(5, 'Must be 0-5'),
+  finalApproverRole: z.enum(['hr', 'admin']),
+  status: z.enum(['active', 'inactive']).optional().default('active'),
+});
+
+export const updateApprovalPolicySchema = z.object({
+  name: z.string().trim().min(1).max(80).optional(),
+  managerStages: z.number().int().min(0).max(5).optional(),
+  finalApproverRole: z.enum(['hr', 'admin']).optional(),
+  status: z.enum(['active', 'inactive']).optional(),
+}).refine((d) => Object.keys(d).length > 0, 'At least one field is required');
+
+// --- V2 Step 4: Reassignment ---
+export const reassignApproverSchema = z.object({
+  stage: z.number().int().min(0, 'Stage must be >= 0'),
+  newApproverId: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid new approver id'),
+  expectedCurrentApproverId: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid expected current approver id'),
+  reason: z.string().trim().min(5, 'Reason must be at least 5 characters').max(500),
+});
+
 // --- Helpers ---
 /** Validates `body` against a Zod schema; returns { data } or { error }. */
 export function validate(schema, body) {

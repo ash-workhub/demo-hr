@@ -262,10 +262,17 @@ export async function POST(request) {
     const employeeMap = new Map(allManagers.map((e) => [e._id.toString(), e]));
     const managementChain = buildManagementChain(targetEmployee, employeeMap);
 
+    // V2 Step 6 regression fix: if the policy requires manager stages but the
+    // employee has no manager (e.g., HR/Admin/top-level), reduce the effective
+    // managerStages to match the available chain length. This mirrors the V1
+    // fallback behavior (skip manager → go straight to HR) without changing
+    // the policy itself.
+    const effectiveManagerStages = Math.min(activePolicy.managerStages, managementChain.length);
+
     const routeResult = resolveRoute({
       employeeId: targetEmployee._id.toString(),
       managementChain,
-      policy: activePolicy,
+      policy: { ...activePolicy, managerStages: effectiveManagerStages },
     });
 
     if (routeResult.error) {

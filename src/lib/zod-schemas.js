@@ -280,6 +280,25 @@ export const updatePayrollSettingsSchema = z.object({
   enabled: z.boolean().optional(),
 }).refine((d) => Object.keys(d).length > 0, 'At least one field is required');
 
+// --- V3 Step 2: Compensation records ---
+export const createCompensationSchema = z.object({
+  employeeId: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid employee id'),
+  basePay: z.number().int('Base pay must be an integer (paisa)').min(0, 'Base pay must be >= 0'),
+  allowances: z.array(z.object({
+    name: z.string().trim().min(1, 'Allowance name required').max(50),
+    amount: z.number().int('Allowance amount must be an integer (paisa)').min(0, 'Amount must be >= 0'),
+  })).optional().default([]),
+  effectiveDate: z.string().refine((v) => !isNaN(Date.parse(v)), 'Invalid effective date'),
+  note: z.string().trim().max(500).optional().default(''),
+}).refine(
+  (d) => {
+    // Check for duplicate allowance names (case-insensitive)
+    const names = (d.allowances || []).map(a => a.name.trim().toLowerCase());
+    return names.length === new Set(names).size;
+  },
+  { message: 'Duplicate allowance names are not allowed', path: ['allowances'] }
+);
+
 // --- Helpers ---
 /** Validates `body` against a Zod schema; returns { data } or { error }. */
 export function validate(schema, body) {

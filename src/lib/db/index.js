@@ -27,3 +27,5 @@ export { default as CompanyNotice, NOTICE_STATUS, AUDIENCE_ROLES } from './model
 export { default as NoticeReadState } from './models/NoticeReadState.js';
 // V3 Step 1 — payroll settings (company-level demo config)
 export { default as PayrollSettings } from './models/PayrollSettings.js';
+// V3 Step 2 — effective-dated compensation records
+export { default as CompensationRecord } from './models/CompensationRecord.js';

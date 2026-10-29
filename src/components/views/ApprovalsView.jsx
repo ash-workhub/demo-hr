@@ -1,7 +1,7 @@
 // src/components/views/ApprovalsView.jsx
 // Pending approvals queue (manager/hr/admin). Approve / reject with notes.
 'use client';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 const STATUS_STYLES = {
   pending_manager: 'bg-amber-100 text-amber-700 border-amber-200',
@@ -42,6 +42,7 @@ export default function ApprovalsView({ user, employee }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [acting, setActing] = useState(null); // id of leave being acted on
+  const processedIds = useRef(new Set()); // guard against duplicate API calls
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -64,7 +65,14 @@ export default function ApprovalsView({ user, employee }) {
   }, [load]);
 
   async function handleAction(id, decision, note = '') {
+    // Guard: prevent duplicate API calls for the same leave ID.
+    if (processedIds.current.has(id)) return;
+    processedIds.current.add(id);
+    
     setActing(id);
+    // Optimistic update: immediately remove the item from the local list
+    // so the user can't click it again while the API request is in flight.
+    setItems((prev) => prev.filter((it) => it.id !== id));
     try {
       const res = await fetch(`/api/leave/${id}/action`, {
         method: 'POST',
@@ -73,12 +81,19 @@ export default function ApprovalsView({ user, employee }) {
       });
       const data = await res.json();
       if (!res.ok) {
+        // API failed — reload the list to restore the item
         alert(data.error?._ || 'Action failed');
+        processedIds.current.delete(id); // allow retry
+        await load();
       } else {
+        // Success — reload to get the updated list
         await load();
       }
     } catch (e) {
       alert(e.message);
+      processedIds.current.delete(id); // allow retry
+      // Network error — reload to restore the item
+      await load();
     } finally {
       setActing(null);
     }
@@ -129,13 +144,17 @@ function ApprovalCard({ lr, user, acting, onApprove, onReject }) {
   const [showNote, setShowNote] = useState(false);
   const [note, setNote] = useState('');
   const [pendingDecision, setPendingDecision] = useState(null); // 'approve' | 'reject'
+  const [submitted, setSubmitted] = useState(false); // guard: prevent double-submit at card level
 
   function startAction(decision) {
+    if (submitted) return;
     setPendingDecision(decision);
     setShowNote(true);
   }
 
   async function confirmAction() {
+    if (submitted) return;
+    setSubmitted(true); // immediately block any further clicks
     const decision = pendingDecision;
     setShowNote(false);
     setNote('');
@@ -189,17 +208,17 @@ function ApprovalCard({ lr, user, acting, onApprove, onReject }) {
                 <button
                   type="button"
                   onClick={confirmAction}
-                  disabled={acting === lr.id}
+                  disabled={submitted || acting === lr.id}
                   className={`px-3 py-1.5 rounded-md text-xs font-semibold text-white disabled:opacity-60 ${
                     pendingDecision === 'approve' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700'
                   }`}
                 >
-                  {acting === lr.id ? 'Processing…' : `Confirm ${pendingDecision}`}
+                  {submitted || acting === lr.id ? 'Processing…' : `Confirm ${pendingDecision}`}
                 </button>
                 <button
                   type="button"
                   onClick={cancelAction}
-                  disabled={acting === lr.id}
+                  disabled={submitted || acting === lr.id}
                   className="px-3 py-1.5 rounded-md border border-slate-200 text-slate-700 text-xs font-medium hover:bg-slate-50 disabled:opacity-60"
                 >
                   Cancel

@@ -299,6 +299,13 @@ export const createCompensationSchema = z.object({
   { message: 'Duplicate allowance names are not allowed', path: ['allowances'] }
 );
 
+// --- V3 Step 4: Payroll run generation ---
+export const generatePayrollRunSchema = z.object({
+  year: z.number().int().min(2000).max(2100),
+  month: z.number().int().min(1).max(12),
+  mode: z.enum(['FULL_MONTH', 'PRORATED']).optional().default('FULL_MONTH'),
+});
+
 // --- Helpers ---
 /** Validates `body` against a Zod schema; returns { data } or { error }. */
 export function validate(schema, body) {

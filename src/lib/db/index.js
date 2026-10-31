@@ -29,3 +29,5 @@ export { default as NoticeReadState } from './models/NoticeReadState.js';
 export { default as PayrollSettings } from './models/PayrollSettings.js';
 // V3 Step 2 — effective-dated compensation records
 export { default as CompensationRecord } from './models/CompensationRecord.js';
+// V3 Step 4 — payroll runs (draft, per company/month)
+export { default as PayrollRun, RUN_STATUS } from './models/PayrollRun.js';

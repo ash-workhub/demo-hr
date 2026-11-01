@@ -72,6 +72,10 @@ const runSchema = new mongoose.Schema(
     generatedBy: { type: String, required: true },
     generatedByName: { type: String, default: '' },
     generatedAt: { type: Date, default: Date.now },
+    // V3 Step 5 — Lock audit.
+    lockedBy: { type: String, default: '' },
+    lockedByName: { type: String, default: '' },
+    lockedAt: { type: Date, default: null },
     // Calculation settings used for this run.
     calcMode: { type: String, enum: ['FULL_MONTH', 'PRORATED'], required: true, default: 'FULL_MONTH' },
     calcVersion: { type: String, default: 'v3-step3' },

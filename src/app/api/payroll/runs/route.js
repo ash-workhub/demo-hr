@@ -35,6 +35,9 @@ function toSafeRun(run, includeLines = true) {
     generatedBy: run.generatedBy,
     generatedByName: run.generatedByName,
     generatedAt: run.generatedAt,
+    lockedBy: run.lockedBy || '',
+    lockedByName: run.lockedByName || '',
+    lockedAt: run.lockedAt || null,
     createdAt: run.createdAt,
     updatedAt: run.updatedAt,
   };
